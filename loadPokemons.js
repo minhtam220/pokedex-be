@@ -2,7 +2,7 @@ const fs = require("fs").promises;
 const fsSync = require("fs");
 const csv = require("csvtojson");
 
-const createPokemons = async () => {
+const loadPokemons = async () => {
   //Load the csv
   let newData = await csv().fromFile("pokemon.csv");
 
@@ -23,8 +23,10 @@ const createPokemons = async () => {
   }
 
   newData = newData.map((item, index) => ({
-    ...item,
-    ID: index + 1, // Adding 1 to the index to start the ID from 1
+    id: index + 1, // Adding 1 to the index to start the ID from 1
+    name: item.Name,
+    type1: item.Type1,
+    type2: item.Type2,
   }));
 
   //Write data to json
@@ -33,4 +35,4 @@ const createPokemons = async () => {
   fsSync.writeFileSync("pokemons.json", JSON.stringify(data));
 };
 
-createPokemons();
+loadPokemons();

@@ -13,7 +13,7 @@ const crypto = require("crypto");
 router.get("/", (req, res, next) => {
   //input validation
 
-  const allowedFilter = ["Name", "Type1", "Type2", "page", "limit"];
+  const allowedFilter = ["name", "type1", "type2", "page", "limit"];
   try {
     let { page, limit, ...filterQuery } = req.query;
     page = parseInt(page) || 1;
@@ -69,11 +69,12 @@ router.get("/", (req, res, next) => {
  * query:
  * method: get
  */
+function isIdExists(id, pokemons) {
+  return pokemons.some((pokemon) => pokemon.id === id);
+}
 
 router.get("/:pokemonId", (req, res, next) => {
   const { pokemonId } = req.params;
-
-  //input validation
 
   try {
     //processing logic
@@ -84,22 +85,32 @@ router.get("/:pokemonId", (req, res, next) => {
     const { pokemons } = db;
 
     //Validate the pokemonId
-    if (parseInt(pokemonId) > pokemons.length || parseInt(pokemonId) === 0) {
+    if (!pokemons.some((pokemon) => pokemon.id === parseInt(pokemonId))) {
       const exception = new Error(`Pokemon ID is not valid.`);
       exception.statusCode = 401;
       throw exception;
     }
 
+    /*
+    if (parseInt(pokemonId) > pokemons.length || parseInt(pokemonId) === 0) {
+      const exception = new Error(`Pokemon ID is not valid.`);
+      exception.statusCode = 401;
+      throw exception;
+    }
+    */
+
     //Filter data by pokemon Id
     let result = [];
 
-    let previousPokemonIndex =
-      parseInt(pokemonId) === 1 ? pokemons.length - 1 : parseInt(pokemonId) - 2;
+    let currentPokemonIndex = pokemons.findIndex(
+      (pokemon) => pokemon.id === parseInt(pokemonId)
+    );
 
-    let currentPokemonIndex = parseInt(pokemonId) - 1;
+    let previousPokemonIndex =
+      currentPokemonIndex === 0 ? pokemons.length - 1 : currentPokemonIndex - 1;
 
     let nextPokemonIndex =
-      parseInt(pokemonId) === pokemons.length ? 0 : parseInt(pokemonId);
+      currentPokemonIndex === pokemons.length - 1 ? 0 : currentPokemonIndex + 1;
 
     result.push(pokemons[previousPokemonIndex]);
     result.push(pokemons[currentPokemonIndex]);
@@ -129,18 +140,20 @@ router.post("/", (req, res, next) => {
       exception.statusCode = 401;
       throw exception;
     }
-    //post processing
-
-    const newPokemon = {
-      name,
-      type1,
-      type2: type2 || "",
-    };
 
     //Read data from db.json then parse to JSobject
     let db = fs.readFileSync("pokemons.json", "utf-8");
     db = JSON.parse(db);
     const { pokemons } = db;
+
+    //post processing
+    const newPokemon = {
+      id:
+        pokemons.reduce((maxId, pokemon) => Math.max(maxId, pokemon.id), 0) + 1,
+      name,
+      type1,
+      type2: type2 || "",
+    };
 
     //Add new pokemon to pokemon JS object
     pokemons.push(newPokemon);
@@ -153,6 +166,107 @@ router.post("/", (req, res, next) => {
 
     //post send response
     res.status(200).send(newPokemon);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * params: /
+ * description: update a pokemon
+ * query:
+ * method: put
+ */
+
+router.put("/:pokemonId", (req, res, next) => {
+  //put input validation
+
+  try {
+    const allowUpdate = ["name", "type1", "type2"];
+
+    const { pokemonId } = req.params;
+
+    const updates = req.body;
+    const updateKeys = Object.keys(updates);
+    //find update request that not allow
+    const notAllow = updateKeys.filter((el) => !allowUpdate.includes(el));
+
+    if (notAllow.length) {
+      const exception = new Error(`Update field not allow`);
+      exception.statusCode = 401;
+      throw exception;
+    }
+    //put processing
+    //Read data from db.json then parse to JSobject
+    let db = fs.readFileSync("pokemons.json", "utf-8");
+    db = JSON.parse(db);
+    const { pokemons } = db;
+
+    //Validate the pokemonId
+    if (!pokemons.some((pokemon) => pokemon.id === parseInt(pokemonId))) {
+      const exception = new Error(`Pokemon ID is not valid.`);
+      exception.statusCode = 401;
+      throw exception;
+    }
+
+    let currentPokemonIndex = pokemons.findIndex(
+      (pokemon) => pokemon.id === parseInt(pokemonId)
+    );
+
+    //Update new content to db book JS object
+    const updatedPokemon = { ...pokemons[currentPokemonIndex], ...updates };
+    pokemons[currentPokemonIndex] = updatedPokemon;
+
+    //db JSobject to JSON string
+
+    db = JSON.stringify(db);
+    //write and save to db.json
+    fs.writeFileSync("pokemons.json", db);
+
+    //put send response
+    res.status(200).send(updatedPokemon);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * params: /
+ * description: delete a pokemon
+ * query:
+ * method: delete
+ */
+
+router.delete("/:pokemonId", (req, res, next) => {
+  //delete input validation
+
+  try {
+    const { pokemonId } = req.params;
+    //delete processing
+    //Read data from db.json then parse to JSobject
+    let db = fs.readFileSync("pokemons.json", "utf-8");
+    db = JSON.parse(db);
+    const { pokemons } = db;
+
+    //Validate the pokemonId
+    if (!pokemons.some((pokemon) => pokemon.id === parseInt(pokemonId))) {
+      const exception = new Error(`Pokemon ID is not valid.`);
+      exception.statusCode = 401;
+      throw exception;
+    }
+
+    //filter db pokemons object
+    db.pokemons = pokemons.filter(
+      (pokemon) => pokemon.id !== parseInt(pokemonId)
+    );
+
+    //db JSobject to JSON string
+    db = JSON.stringify(db);
+    //write and save to db.json
+    fs.writeFileSync("pokemons.json", db);
+
+    //delete send response
+    res.status(200).send({});
   } catch (error) {
     next(error);
   }

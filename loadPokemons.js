@@ -1,6 +1,7 @@
 const fs = require("fs").promises;
 const fsSync = require("fs");
 const csv = require("csvtojson");
+const { faker } = require("@faker-js/faker");
 
 const loadPokemons = async () => {
   //Load the csv
@@ -25,8 +26,16 @@ const loadPokemons = async () => {
   newData = newData.map((item, index) => ({
     id: index + 1, // Adding 1 to the index to start the ID from 1
     name: item.Name,
-    type1: item.Type1,
-    type2: item.Type2,
+    types: [
+      item.Type1.toLowerCase(),
+      item.Type2 ? item.Type2.toLowerCase() : null,
+    ],
+    url: `images/${item.Name}.png`,
+    description: faker.lorem.lines(2),
+    height: faker.number.int({ max: 100 }),
+    weight: faker.number.int({ max: 100 }),
+    categories: faker.animal.type(),
+    abilities: faker.word.verb() + " " + faker.word.adverb(),
   }));
 
   //Write data to json

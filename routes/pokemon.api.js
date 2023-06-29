@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const fs = require("fs");
 const crypto = require("crypto");
+const { faker } = require("@faker-js/faker");
 
 /**
  * params: /
@@ -13,13 +14,14 @@ const crypto = require("crypto");
 router.get("/", (req, res, next) => {
   //input validation
 
-  const allowedFilter = ["name", "type1", "type2", "page", "limit"];
+  const allowedFilter = ["name", "types", "page", "limit"];
   try {
     let { page, limit, ...filterQuery } = req.query;
     page = parseInt(page) || 1;
     limit = parseInt(limit) || 10;
     //allow title,limit and page query string only
     const filterKeys = Object.keys(filterQuery);
+
     filterKeys.forEach((key) => {
       if (!allowedFilter.includes(key)) {
         const exception = new Error(`Query ${key} is not allowed`);
@@ -28,6 +30,7 @@ router.get("/", (req, res, next) => {
       }
       if (!filterQuery[key]) delete filterQuery[key];
     });
+
     //processing logic
 
     //Number of items skip for selection
@@ -43,16 +46,27 @@ router.get("/", (req, res, next) => {
     if (filterKeys.length) {
       filterKeys.forEach((condition) => {
         result = result.length
-          ? result.filter(
-              (pokemon) => pokemon[condition] === filterQuery[condition]
-            )
-          : pokemons.filter(
-              (pokemon) => pokemon[condition] === filterQuery[condition]
-            );
+          ? result.filter((pokemon) => {
+              const filterValue = filterQuery[condition];
+              if (Array.isArray(pokemon[condition])) {
+                return pokemon[condition].includes(filterValue);
+              } else {
+                return pokemon[condition] === filterValue;
+              }
+            })
+          : pokemons.filter((pokemon) => {
+              const filterValue = filterQuery[condition];
+              if (Array.isArray(pokemon[condition])) {
+                return pokemon[condition].includes(filterValue);
+              } else {
+                return pokemon[condition] === filterValue;
+              }
+            });
       });
     } else {
       result = pokemons;
     }
+
     //then select number of result by offset
     result = result.slice(offset, offset + limit);
 
@@ -69,10 +83,6 @@ router.get("/", (req, res, next) => {
  * query:
  * method: get
  */
-function isIdExists(id, pokemons) {
-  return pokemons.some((pokemon) => pokemon.id === id);
-}
-
 router.get("/:pokemonId", (req, res, next) => {
   const { pokemonId } = req.params;
 
@@ -90,14 +100,6 @@ router.get("/:pokemonId", (req, res, next) => {
       exception.statusCode = 401;
       throw exception;
     }
-
-    /*
-    if (parseInt(pokemonId) > pokemons.length || parseInt(pokemonId) === 0) {
-      const exception = new Error(`Pokemon ID is not valid.`);
-      exception.statusCode = 401;
-      throw exception;
-    }
-    */
 
     //Filter data by pokemon Id
     let result = [];
@@ -131,12 +133,33 @@ router.get("/:pokemonId", (req, res, next) => {
  */
 
 router.post("/", (req, res, next) => {
+  const pokemonTypes = [
+    "bug",
+    "dragon",
+    "fairy",
+    "fire",
+    "ghost",
+    "ground",
+    "normal",
+    "psychic",
+    "steel",
+    "dark",
+    "electric",
+    "fighting",
+    "flying",
+    "grass",
+    "ice",
+    "poison",
+    "rock",
+    "water",
+  ];
+
   //post input validation
 
   try {
     const { name, type1, type2 } = req.body;
     if (!name || !type1) {
-      const exception = new Error(`Missing body info`);
+      const exception = new Error(`Missing required data`);
       exception.statusCode = 401;
       throw exception;
     }
@@ -147,12 +170,31 @@ router.post("/", (req, res, next) => {
     const { pokemons } = db;
 
     //post processing
+    //validate if pokemon name already exists
+    if (pokemons.some((pokemon) => pokemon.name === name)) {
+      const exception = new Error(`Pokemon already exists.`);
+      exception.statusCode = 401;
+      throw exception;
+    }
+
+    //validate the pokemon types
+    if (!pokemonTypes.includes(type1) || !pokemonTypes.includes(type2)) {
+      const exception = new Error(`Pokemon Type not valid.`);
+      exception.statusCode = 401;
+      throw exception;
+    }
+
     const newPokemon = {
       id:
         pokemons.reduce((maxId, pokemon) => Math.max(maxId, pokemon.id), 0) + 1,
       name,
-      type1,
-      type2: type2 || "",
+      types: [type1, type2 ? type2 : null],
+      url: `images/${name}.png`,
+      description: faker.lorem.lines(2),
+      height: faker.number.int({ max: 100 }),
+      weight: faker.number.int({ max: 100 }),
+      categories: faker.animal.type(),
+      abilities: faker.word.verb() + " " + faker.word.adverb(),
     };
 
     //Add new pokemon to pokemon JS object
